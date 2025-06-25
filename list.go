@@ -99,6 +99,7 @@ func (dl *DLinkedList[T]) Process(ctx context.Context) error {
 
 	dl.mutex.Lock()
 	var pending []*Node[T]
+
 	for node := dl.tail; node != nil; node = node.Prev {
 		if node.ProcessedPayload == nil {
 			pending = append(pending, node)
@@ -120,12 +121,14 @@ func (dl *DLinkedList[T]) Process(ctx context.Context) error {
 
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 			for {
 				select {
 				case <-ctx.Done():
 					return
+
 				case node, ok := <-work:
 					if !ok {
 						return
@@ -148,13 +151,17 @@ func (dl *DLinkedList[T]) Process(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			close(work)
+
 			wg.Wait()
+
 			return ctx.Err()
+
 		case work <- pending[i]:
 		}
 	}
 
 	close(work)
 	wg.Wait()
+
 	return nil
 }

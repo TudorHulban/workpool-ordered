@@ -1,20 +1,9 @@
 package workpoolordered
 
 import (
-	"context"
-	"errors"
 	"sync"
+	"sync/atomic"
 )
-
-type Processor[T any] func(T) (T, error)
-
-type Node[T any] struct {
-	Payload          T
-	ProcessedPayload *T // Use pointer to distinguish nil from zero value
-
-	Prev *Node[T]
-	Next *Node[T]
-}
 
 type DLinkedList[T any] struct {
 	head *Node[T]
@@ -24,9 +13,9 @@ type DLinkedList[T any] struct {
 
 	processor Processor[T]
 
-	length      int
+	unprocessed atomic.Int64
+	length      atomic.Int64
 	workerLimit int
-	unprocessed int
 }
 
 func NewDLinkedList[T any](processor Processor[T], workers int) *DLinkedList[T] {
@@ -37,11 +26,11 @@ func NewDLinkedList[T any](processor Processor[T], workers int) *DLinkedList[T] 
 }
 
 func (dl *DLinkedList[T]) Insert(payload T) {
+	dl.length.Add(1)
+	dl.unprocessed.Add(1)
+
 	dl.mutex.Lock()
 	defer dl.mutex.Unlock()
-
-	dl.length++
-	dl.unprocessed++
 
 	node := &Node[T]{
 		Payload: payload,
@@ -85,71 +74,9 @@ func (dl *DLinkedList[T]) Read() []T {
 			dl.tail = current.Prev
 		}
 
-		dl.length--
+		dl.length.Add(-1)
 		current = prev
 	}
 
 	return results
-}
-
-func (dl *DLinkedList[T]) Process(ctx context.Context) error {
-	if dl.processor == nil {
-		return errors.New("processor not set")
-	}
-
-	// Main continuous loop
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			// Single lock to check unprocessed AND collect pending work
-			dl.mutex.Lock()
-
-			if dl.unprocessed == 0 {
-				dl.mutex.Unlock()
-				return nil // All done, exit
-			}
-
-			// Find pending work while we have the lock
-			var pending []*Node[T]
-			for node := dl.tail; node != nil; node = node.Prev {
-				if node.ProcessedPayload == nil {
-					pending = append(pending, node)
-				}
-			}
-			dl.mutex.Unlock()
-
-			// Determine worker count for this iteration
-			workerCount := dl.workerLimit
-			if len(pending) < workerCount {
-				workerCount = len(pending)
-			}
-
-			// Start workers for this batch
-			var wg sync.WaitGroup
-
-			for ix := 0; ix < workerCount; ix++ {
-				wg.Add(1)
-
-				go func(nodeIndex int) {
-					defer wg.Done()
-
-					if nodeIndex < len(pending) {
-						node := pending[nodeIndex]
-
-						result, err := dl.processor(node.Payload)
-						if err == nil {
-							dl.mutex.Lock()
-							node.ProcessedPayload = &result
-							dl.unprocessed--
-							dl.mutex.Unlock()
-						}
-					}
-				}(ix)
-			}
-
-			wg.Wait()
-		}
-	}
 }

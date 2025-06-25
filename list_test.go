@@ -26,8 +26,8 @@ func TestOneWorkerList(t *testing.T) {
 		[]byte("c"),
 	)
 
-	require.Equal(t, 3, list.length)
-	require.Equal(t, 3, list.unprocessed)
+	require.EqualValues(t, 3, list.length.Load())
+	require.EqualValues(t, 3, list.unprocessed.Load())
 
 	go list.Process(context.Background())
 
@@ -61,8 +61,8 @@ func TestManyWorkersList(t *testing.T) {
 		[]byte("c"),
 	)
 
-	require.Equal(t, 3, list.length)
-	require.Equal(t, 3, list.unprocessed)
+	require.EqualValues(t, 3, list.length.Load())
+	require.EqualValues(t, 3, list.unprocessed.Load())
 
 	go list.Process(context.Background())
 

@@ -97,71 +97,59 @@ func (dl *DLinkedList[T]) Process(ctx context.Context) error {
 		return errors.New("processor not set")
 	}
 
-	dl.mutex.Lock()
-	var pending []*Node[T]
-
-	for node := dl.tail; node != nil; node = node.Prev {
-		if node.ProcessedPayload == nil {
-			pending = append(pending, node)
-		}
-	}
-	dl.mutex.Unlock()
-
-	if len(pending) == 0 {
-		return nil
-	}
-
-	workerCount := dl.workerLimit
-	if len(pending) < workerCount {
-		workerCount = len(pending)
-	}
-
-	var wg sync.WaitGroup
-	work := make(chan *Node[T], workerCount)
-
-	for i := 0; i < workerCount; i++ {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-
-				case node, ok := <-work:
-					if !ok {
-						return
-					}
-
-					result, err := dl.processor(node.Payload)
-					if err == nil {
-						dl.mutex.Lock()
-						node.ProcessedPayload = &result
-						dl.unprocessed--
-						dl.mutex.Unlock()
-					}
-				}
-			}
-		}()
-	}
-
-	// Process from tail to head (oldest first)
-	for i := 0; i < len(pending); i++ {
+	// Main continuous loop
+	for {
 		select {
 		case <-ctx.Done():
-			close(work)
+			return ctx.Err()
+		default:
+			// Single lock to check unprocessed AND collect pending work
+			dl.mutex.Lock()
+
+			if dl.unprocessed == 0 {
+				dl.mutex.Unlock()
+				return nil // All done, exit
+			}
+
+			// Find pending work while we have the lock
+			var pending []*Node[T]
+			for node := dl.tail; node != nil; node = node.Prev {
+				if node.ProcessedPayload == nil {
+					pending = append(pending, node)
+				}
+			}
+			dl.mutex.Unlock()
+
+			// Determine worker count for this iteration
+			workerCount := dl.workerLimit
+			if len(pending) < workerCount {
+				workerCount = len(pending)
+			}
+
+			// Start workers for this batch
+			var wg sync.WaitGroup
+
+			for ix := 0; ix < workerCount; ix++ {
+				wg.Add(1)
+
+				go func(nodeIndex int) {
+					defer wg.Done()
+
+					if nodeIndex < len(pending) {
+						node := pending[nodeIndex]
+
+						result, err := dl.processor(node.Payload)
+						if err == nil {
+							dl.mutex.Lock()
+							node.ProcessedPayload = &result
+							dl.unprocessed--
+							dl.mutex.Unlock()
+						}
+					}
+				}(ix)
+			}
 
 			wg.Wait()
-
-			return ctx.Err()
-
-		case work <- pending[i]:
 		}
 	}
-
-	close(work)
-	wg.Wait()
-
-	return nil
 }

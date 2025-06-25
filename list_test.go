@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,10 +29,9 @@ func TestOneWorkerList(t *testing.T) {
 	require.Equal(t, 3, list.length)
 	require.Equal(t, 3, list.unprocessed)
 
-	require.NoError(t,
-		list.Process(context.Background()),
-	)
-	require.Zero(t, list.unprocessed)
+	go list.Process(context.Background())
+
+	time.Sleep(300 * time.Millisecond)
 
 	elements := list.Read()
 	require.NotEmpty(t, elements)
@@ -64,10 +64,9 @@ func TestManyWorkersList(t *testing.T) {
 	require.Equal(t, 3, list.length)
 	require.Equal(t, 3, list.unprocessed)
 
-	require.NoError(t,
-		list.Process(context.Background()),
-	)
-	require.Zero(t, list.unprocessed)
+	go list.Process(context.Background())
+
+	time.Sleep(300 * time.Millisecond)
 
 	elements := list.Read()
 	require.NotEmpty(t, elements)

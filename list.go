@@ -11,7 +11,9 @@ type DLinkedList[T any] struct {
 
 	mutex sync.Mutex
 
-	processor Processor[T]
+	processor          Processor[T]
+	chPayload          chan T
+	chPayloadProcessed chan T
 
 	unprocessed atomic.Int64
 	length      atomic.Int64
@@ -19,10 +21,17 @@ type DLinkedList[T any] struct {
 }
 
 func NewDLinkedList[T any](processor Processor[T], workers int) *DLinkedList[T] {
-	return &DLinkedList[T]{
+	result := DLinkedList[T]{
 		processor:   processor,
 		workerLimit: workers,
+
+		chPayload:          make(chan T),
+		chPayloadProcessed: make(chan T),
 	}
+
+	go result.Process()
+
+	return &result
 }
 
 func (dl *DLinkedList[T]) Insert(payload T) {

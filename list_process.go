@@ -1,12 +1,11 @@
 package workpoolordered
 
 import (
-	"context"
 	"errors"
 	"sync"
 )
 
-func (dl *DLinkedList[T]) Process(ctx context.Context) error {
+func (dl *DLinkedList[T]) Process() error {
 	if dl.processor == nil {
 		return errors.New("processor not set")
 	}

@@ -43,7 +43,7 @@ func NewCList[T any](params *ParamsCList[T]) (*CList[T], error) {
 	}
 
 	if !params.WaitToStartWork {
-		go result.process()
+		go result.doWork()
 	}
 
 	return &result,
@@ -63,6 +63,7 @@ func (l *CList[T]) Insert(payload T) {
 
 	if l.head == nil {
 		l.head, l.tail = node, node
+
 		return
 	}
 
@@ -81,8 +82,11 @@ func (l *CList[T]) Read() []T {
 
 	for current != nil {
 		if current.processedPayload == nil {
-			break
+			current = current.prev
+
+			continue
 		}
+
 		results = append(results, *current.processedPayload)
 		prev := current.prev
 
@@ -104,4 +108,8 @@ func (l *CList[T]) Read() []T {
 	}
 
 	return results
+}
+
+func (l *CList[T]) Close() {
+	l.chStop <- struct{}{}
 }

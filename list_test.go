@@ -35,7 +35,7 @@ func TestOneWorkerList(t *testing.T) {
 	require.EqualValues(t, 3, list.length.Load())
 	require.EqualValues(t, 3, list.unprocessed.Load())
 
-	go list.process()
+	go list.doWork()
 
 	time.Sleep(300 * time.Millisecond)
 
@@ -90,7 +90,7 @@ func TestManyWorkersList(t *testing.T) {
 	require.EqualValues(t, 3, list.length.Load())
 	require.EqualValues(t, 3, list.unprocessed.Load())
 
-	go list.process()
+	go list.doWork()
 
 	time.Sleep(300 * time.Millisecond)
 

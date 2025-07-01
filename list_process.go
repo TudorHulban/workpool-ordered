@@ -1,6 +1,7 @@
 package workpoolordered
 
-func (l *CList[T]) process() error {
+// doWork is blocking so should be run in own goroutine.
+func (l *CList[T]) doWork() error {
 	for {
 		select {
 		case <-l.chStop:

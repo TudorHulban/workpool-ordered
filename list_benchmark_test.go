@@ -1,19 +1,20 @@
 package workpoolordered
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
-// Simple string processor for benchmarking
-func stringProcessor(s string) (string, error) {
+// Simple string processor for benchmarking.
+func stringProcessor(s string) (string, bool, error) {
 	// Simulate some work
-	return fmt.Sprintf("processed-%s", s), nil
+	return fmt.Sprintf("processed-%s", s), false, nil
 }
 
-// Heavy computation processor
+// Heavy computation processor.
 func heavyProcessor(s string) (string, error) {
 	// Simulate CPU-intensive work
 	sum := 0
@@ -36,7 +37,13 @@ func ioProcessor(s string) (string, error) {
 // cpu: AMD Ryzen 7 5800H with Radeon Graphics
 // BenchmarkInsert-16    	 9932575	       112.3 ns/op	      72 B/op	       2 allocs/op
 func BenchmarkInsert(b *testing.B) {
-	list := NewDLinkedList(stringProcessor, 1)
+	list, errCr := NewCList(
+		&ParamsCList[string]{
+			Processor: stringProcessor,
+			Workers:   1,
+		},
+	)
+	require.NoError(b, errCr)
 
 	b.ResetTimer()
 
@@ -73,7 +80,12 @@ func BenchmarkProcess(b *testing.B) {
 					for i := 0; i < b.N; i++ {
 						b.StopTimer()
 
-						list := NewDLinkedList(stringProcessor, workers)
+						list, _ := NewCList(
+							&ParamsCList[string]{
+								Processor: stringProcessor,
+								Workers:   workers,
+							},
+						)
 
 						// Populate list
 						for j := 0; j < items; j++ {
@@ -81,14 +93,6 @@ func BenchmarkProcess(b *testing.B) {
 						}
 
 						b.StartTimer()
-
-						// Create context with timeout to prevent hanging
-						ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-						// Process will return when unprocessed == 0 or timeout
-						list.Process(ctx)
-
-						cancel() // Clean up
 					}
 				},
 			)

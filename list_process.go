@@ -1,67 +1,38 @@
 package workpoolordered
 
-import (
-	"errors"
-	"sync"
-)
-
-func (dl *DLinkedList[T]) Process() error {
-	if dl.processor == nil {
-		return errors.New("processor not set")
-	}
-
+func (l *CList[T]) process() error {
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-l.chStop:
+			return nil
 
 		default:
-			dl.mutex.Lock()
+			l.Lock()
 
-			if dl.unprocessed.Load() == 0 {
-				dl.mutex.Unlock()
+			if l.unprocessed.Load() == 0 {
+				l.Unlock()
+
 				return nil // All done
 			}
 
 			var pending []*Node[T]
-			for node := dl.tail; node != nil; node = node.Prev {
-				if node.ProcessedPayload == nil {
+
+			for node := l.tail; node != nil; node = node.prev {
+				if node.processedPayload == nil {
 					pending = append(pending, node)
 				}
 			}
 
-			dl.mutex.Unlock()
+			l.Unlock()
 
 			if len(pending) == 0 {
 				continue
 			}
 
-			// Limit to max allowed workers
-			workerCount := dl.workerLimit
-			if len(pending) < workerCount {
-				workerCount = len(pending)
+			// distribute found work
+			for _, node := range pending {
+				l.chWork <- node
 			}
-
-			var wg sync.WaitGroup
-			wg.Add(workerCount)
-
-			for ix := range workerCount {
-				node := pending[ix] // safe slice access
-
-				go func(n *Node[T]) {
-					defer wg.Done()
-
-					result, errProcess := dl.processor(n.Payload)
-					if errProcess == nil {
-						dl.mutex.Lock()
-						n.ProcessedPayload = &result
-						dl.unprocessed.Add(-1)
-						dl.mutex.Unlock()
-					}
-				}(node)
-			}
-
-			wg.Wait()
 		}
 	}
 }

@@ -1,89 +1,105 @@
 package workpoolordered
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 )
 
-type DLinkedList[T any] struct {
+type CList[T any] struct {
 	head *Node[T]
 	tail *Node[T]
 
-	mutex sync.Mutex
+	sync.Mutex
 
-	processor          Processor[T]
-	chPayload          chan T
-	chPayloadProcessed chan T
+	processor Processor[T]
+	chWork    chan *Node[T]
+	chStop    chan struct{}
 
 	unprocessed atomic.Int64
 	length      atomic.Int64
-	workerLimit int
 }
 
-func NewDLinkedList[T any](processor Processor[T], workers int) *DLinkedList[T] {
-	result := DLinkedList[T]{
-		processor:   processor,
-		workerLimit: workers,
+type ParamsCList[T any] struct {
+	Processor       Processor[T]
+	Workers         int
+	WaitToStartWork bool //introduced for tests.
+}
 
-		chPayload:          make(chan T),
-		chPayloadProcessed: make(chan T),
+func NewCList[T any](params *ParamsCList[T]) (*CList[T], error) {
+	if params.Processor == nil {
+		return nil,
+			errors.New("processor not set")
 	}
 
-	go result.Process()
+	result := CList[T]{
+		processor: params.Processor,
+		chWork:    make(chan *Node[T]),
+		chStop:    make(chan struct{}),
+	}
 
-	return &result
+	for range params.Workers {
+		go result.worker()
+	}
+
+	if !params.WaitToStartWork {
+		go result.process()
+	}
+
+	return &result,
+		nil
 }
 
-func (dl *DLinkedList[T]) Insert(payload T) {
-	dl.length.Add(1)
-	dl.unprocessed.Add(1)
+func (l *CList[T]) Insert(payload T) {
+	l.length.Add(1)
+	l.unprocessed.Add(1)
 
-	dl.mutex.Lock()
-	defer dl.mutex.Unlock()
+	l.Lock()
+	defer l.Unlock()
 
 	node := &Node[T]{
 		Payload: payload,
 	}
 
-	if dl.head == nil {
-		dl.head, dl.tail = node, node
+	if l.head == nil {
+		l.head, l.tail = node, node
 		return
 	}
 
-	node.Next = dl.head
-	dl.head.Prev = node
-	dl.head = node
+	node.next = l.head
+	l.head.prev = node
+	l.head = node
 }
 
 // Read returns all processed payloads up to the first unprocessed one
-func (dl *DLinkedList[T]) Read() []T {
-	dl.mutex.Lock()
-	defer dl.mutex.Unlock()
+func (l *CList[T]) Read() []T {
+	l.Lock()
+	defer l.Unlock()
 
 	var results []T
-	current := dl.tail
+	current := l.tail
 
 	for current != nil {
-		if current.ProcessedPayload == nil {
+		if current.processedPayload == nil {
 			break
 		}
-		results = append(results, *current.ProcessedPayload)
-		prev := current.Prev
+		results = append(results, *current.processedPayload)
+		prev := current.prev
 
 		// Remove processed node
-		if current.Prev != nil {
-			current.Prev.Next = current.Next
+		if current.prev != nil {
+			current.prev.next = current.next
 		} else {
-			dl.head = current.Next
+			l.head = current.next
 		}
 
-		if current.Next != nil {
-			current.Next.Prev = current.Prev
+		if current.next != nil {
+			current.next.prev = current.prev
 		} else {
-			dl.tail = current.Prev
+			l.tail = current.prev
 		}
 
-		dl.length.Add(-1)
+		l.length.Add(-1)
 		current = prev
 	}
 

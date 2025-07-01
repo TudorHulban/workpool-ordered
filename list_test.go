@@ -1,7 +1,6 @@
 package workpoolordered
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -9,12 +8,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type payload []byte
+
 func TestOneWorkerList(t *testing.T) {
-	proc := func(payload []byte) ([]byte, error) {
-		return payload, nil
+	proc := func(payload payload) (payload, bool, error) {
+		return payload, false, nil
 	}
 
-	list := NewDLinkedList(proc, 1)
+	list, errCr := NewCList(
+		&ParamsCList[payload]{
+			Processor:       proc,
+			Workers:         1,
+			WaitToStartWork: true,
+		},
+	)
+	require.NoError(t, errCr)
 
 	list.Insert(
 		[]byte("a"),
@@ -28,8 +36,6 @@ func TestOneWorkerList(t *testing.T) {
 
 	require.EqualValues(t, 3, list.length.Load())
 	require.EqualValues(t, 3, list.unprocessed.Load())
-
-	go list.Process(context.Background())
 
 	time.Sleep(300 * time.Millisecond)
 
@@ -45,11 +51,16 @@ func TestOneWorkerList(t *testing.T) {
 }
 
 func TestManyWorkersList(t *testing.T) {
-	proc := func(payload []byte) ([]byte, error) {
-		return payload, nil
+	proc := func(payload payload) (payload, bool, error) {
+		return payload, false, nil
 	}
 
-	list := NewDLinkedList(proc, 4)
+	list, errCr := NewCList(
+		&ParamsCList[payload]{
+			Processor: proc,
+		},
+	)
+	require.NoError(t, errCr)
 
 	list.Insert(
 		[]byte("a"),
@@ -63,8 +74,6 @@ func TestManyWorkersList(t *testing.T) {
 
 	require.EqualValues(t, 3, list.length.Load())
 	require.EqualValues(t, 3, list.unprocessed.Load())
-
-	go list.Process(context.Background())
 
 	time.Sleep(300 * time.Millisecond)
 

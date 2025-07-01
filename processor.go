@@ -1,3 +1,4 @@
 package workpoolordered
 
-type Processor[T any] func(T) (T, error)
+// Processor returns in bool if the node is marked for deletion.
+type Processor[T any] func(T) (T, bool, error)

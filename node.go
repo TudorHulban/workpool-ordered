@@ -2,8 +2,10 @@ package workpoolordered
 
 type Node[T any] struct {
 	Payload          T
-	ProcessedPayload *T // Use pointer to distinguish nil from zero value
+	processedPayload *T // Use pointer to distinguish nil from zero value
 
-	Prev *Node[T]
-	Next *Node[T]
+	prev *Node[T]
+	next *Node[T]
+
+	markedForDeletion bool
 }

@@ -1,15 +1,15 @@
 package workpoolordered
 
-import (
-	"fmt"
-	"time"
-)
+func (l *CList[T]) worker() {
+	for node := range l.chWork {
+		processedPayload, toDelete, errProcess := l.processor(node.Payload)
+		if errProcess != nil {
+			// TODO: log it locally
+		}
 
-func (dl *DLinkedList[T]) worker() {
-	for j := range jobs {
-		fmt.Println("worker", id, "started  job", j)
-		time.Sleep(time.Second)
-		fmt.Println("worker", id, "finished job", j)
-		results <- j * 2
+		node.processedPayload = &processedPayload
+		node.markedForDeletion = toDelete
+
+		l.unprocessed.Add(-1)
 	}
 }

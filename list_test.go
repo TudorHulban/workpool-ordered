@@ -8,15 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type payload []byte
-
 func TestOneWorkerList(t *testing.T) {
-	proc := func(payload payload) (payload, bool, error) {
+	proc := func(payload []byte) ([]byte, bool, error) {
 		return payload, false, nil
 	}
 
 	list, errCr := NewCList(
-		&ParamsCList[payload]{
+		&ParamsCList[[]byte]{
 			Processor:       proc,
 			Workers:         1,
 			WaitToStartWork: true,
@@ -37,12 +35,27 @@ func TestOneWorkerList(t *testing.T) {
 	require.EqualValues(t, 3, list.length.Load())
 	require.EqualValues(t, 3, list.unprocessed.Load())
 
+	go list.process()
+
 	time.Sleep(300 * time.Millisecond)
 
 	elements := list.Read()
-	require.NotEmpty(t, elements)
+	require.NotEmpty(t,
+		elements,
+		"empty read - did process start?",
+	)
 
-	// Should be processed in order: a, b, c (tail to head)
+	// test all items were processed
+	require.Empty(t,
+		NotInByteSliceSource(
+			elements,
+			[]byte("a"),
+			[]byte("b"),
+			[]byte("c"),
+		),
+	)
+
+	// test items are processed in order: a, b, c (tail to head)
 	require.Equal(t, []byte("a"), elements[0])
 	require.Equal(t, []byte("b"), elements[1])
 	require.Equal(t, []byte("c"), elements[2])
@@ -51,13 +64,15 @@ func TestOneWorkerList(t *testing.T) {
 }
 
 func TestManyWorkersList(t *testing.T) {
-	proc := func(payload payload) (payload, bool, error) {
+	proc := func(payload []byte) ([]byte, bool, error) {
 		return payload, false, nil
 	}
 
 	list, errCr := NewCList(
-		&ParamsCList[payload]{
-			Processor: proc,
+		&ParamsCList[[]byte]{
+			Processor:       proc,
+			Workers:         2,
+			WaitToStartWork: true,
 		},
 	)
 	require.NoError(t, errCr)
@@ -75,11 +90,15 @@ func TestManyWorkersList(t *testing.T) {
 	require.EqualValues(t, 3, list.length.Load())
 	require.EqualValues(t, 3, list.unprocessed.Load())
 
+	go list.process()
+
 	time.Sleep(300 * time.Millisecond)
 
 	elements := list.Read()
-	require.NotEmpty(t, elements)
-
+	require.NotEmpty(t,
+		elements,
+		"empty read - did process start?",
+	)
 	// Should be processed in order: a, b, c (tail to head)
 	require.Equal(t, []byte("a"), elements[0])
 	require.Equal(t, []byte("b"), elements[1])

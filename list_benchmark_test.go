@@ -34,8 +34,8 @@ func ioProcessor(s string) (string, error) {
 	return fmt.Sprintf("io-%s", s), nil
 }
 
-// cpu: AMD Ryzen 7 5800H with Radeon Graphics
-// BenchmarkInsert-16    	 9932575	       112.3 ns/op	      72 B/op	       2 allocs/op
+// cpu: AMD Ryzen 5 5600U with Radeon Graphics
+// BenchmarkInsert-12    	 3979898	       305.3 ns/op	     144 B/op	       4 allocs/op
 func BenchmarkInsert(b *testing.B) {
 	list, errCr := NewCList(
 		&ParamsCList[string]{

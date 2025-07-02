@@ -39,7 +39,7 @@ func TestOneWorkerList(t *testing.T) {
 
 	time.Sleep(300 * time.Millisecond)
 
-	elements := list.Read()
+	elements := list.Read(100)
 	require.NotEmpty(t,
 		elements,
 		"empty read - did process start?",
@@ -61,6 +61,12 @@ func TestOneWorkerList(t *testing.T) {
 	require.Equal(t, []byte("c"), elements[2])
 
 	fmt.Println("Processed elements:", elements)
+
+	noElements := list.Read(100)
+	require.Empty(t,
+		noElements,
+		"not empty read - did process not finish?",
+	)
 }
 
 func TestManyWorkersList(t *testing.T) {
@@ -94,7 +100,7 @@ func TestManyWorkersList(t *testing.T) {
 
 	time.Sleep(300 * time.Millisecond)
 
-	elements := list.Read()
+	elements := list.Read(100)
 	require.NotEmpty(t,
 		elements,
 		"empty read - did process start?",

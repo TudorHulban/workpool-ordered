@@ -43,15 +43,23 @@ func TestInsert(t *testing.T) {
 		list.length.Load(),
 	)
 
-	processed := list.Read()
+	batchSize := 10
 
-	require.NotEmpty(t,
-		processed,
+	processed := list.Read(batchSize)
+
+	require.Equal(t,
+		batchSize,
+		len(processed),
+
+		"returned %d items",
+		len(processed),
 	)
 
-	fmt.Println(
+	fmt.Printf(
+		"unprocessed: %d, processed returned: %d, processed all: %d.\n",
 		list.unprocessed.Load(),
 		len(processed),
+		int64(numberItems)-list.unprocessed.Load(),
 	)
 }
 

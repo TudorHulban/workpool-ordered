@@ -2,14 +2,16 @@ package workpoolordered
 
 // Read returns all processed payloads up to the first unprocessed one.
 // Deletes all nodes marked for deletion.
-func (l *CList[T]) Read() []T {
+func (l *CList[T]) Read(upTo int) []T {
 	l.Lock()
 	defer l.Unlock()
 
 	var results []T
 	current := l.tail
 
-	for current != nil {
+	var indexUpTo int
+
+	for current != nil && indexUpTo < upTo {
 		if current.IsMarkedForDeletion() {
 			l.delete(current)
 
@@ -23,6 +25,8 @@ func (l *CList[T]) Read() []T {
 		}
 
 		results = append(results, *current.processedPayload)
+		indexUpTo++
+
 		prev := current.prev
 
 		// Remove processed node

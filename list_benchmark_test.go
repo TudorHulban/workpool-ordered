@@ -7,9 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Simple string processor for benchmarking.
+// stringProcessor simulates some work.
 func stringProcessor(s string) (string, bool, error) {
-	// Simulate some work
 	return fmt.Sprintf("processed-%s", s), false, nil
 }
 

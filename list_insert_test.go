@@ -54,3 +54,32 @@ func TestInsert(t *testing.T) {
 		len(processed),
 	)
 }
+
+func TestUnprocessed(t *testing.T) {
+	proc := func(payload []byte) ([]byte, bool, error) {
+		return payload, false, nil
+	}
+
+	list, errCr := NewCList(
+		&ParamsCList[[]byte]{
+			Processor:       proc,
+			Workers:         1,
+			WaitToStartWork: true,
+		},
+	)
+	require.NoError(t, errCr)
+
+	list.Insert(
+		[]byte("xxx"),
+	)
+
+	require.EqualValues(t,
+		1,
+		list.length.Load(),
+	)
+
+	require.EqualValues(t,
+		1,
+		list.unprocessed.Load(),
+	)
+}

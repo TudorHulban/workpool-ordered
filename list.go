@@ -50,66 +50,6 @@ func NewCList[T any](params *ParamsCList[T]) (*CList[T], error) {
 		nil
 }
 
-func (l *CList[T]) Insert(payload T) {
-	l.length.Add(1)
-	l.unprocessed.Add(1)
-
-	l.Lock()
-	defer l.Unlock()
-
-	node := &Node[T]{
-		Payload: payload,
-	}
-
-	if l.head == nil {
-		l.head, l.tail = node, node
-
-		return
-	}
-
-	node.next = l.head
-	l.head.prev = node
-	l.head = node
-}
-
-// Read returns all processed payloads up to the first unprocessed one
-func (l *CList[T]) Read() []T {
-	l.Lock()
-	defer l.Unlock()
-
-	var results []T
-	current := l.tail
-
-	for current != nil {
-		if current.processedPayload == nil {
-			current = current.prev
-
-			continue
-		}
-
-		results = append(results, *current.processedPayload)
-		prev := current.prev
-
-		// Remove processed node
-		if current.prev != nil {
-			current.prev.next = current.next
-		} else {
-			l.head = current.next
-		}
-
-		if current.next != nil {
-			current.next.prev = current.prev
-		} else {
-			l.tail = current.prev
-		}
-
-		l.length.Add(-1)
-		current = prev
-	}
-
-	return results
-}
-
 func (l *CList[T]) Close() {
 	l.chStop <- struct{}{}
 }

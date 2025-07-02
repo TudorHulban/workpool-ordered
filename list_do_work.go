@@ -30,7 +30,7 @@ func (l *CList[T]) doWork() error {
 				continue
 			}
 
-			// distribute found work
+			// distribute found work.
 			for _, node := range pending {
 				l.chWork <- node
 			}

@@ -8,7 +8,7 @@ func (l *CList[T]) worker() {
 		}
 
 		node.processedPayload = &processedPayload
-		node.markedForDeletion = toDelete
+		node.markedForDeletion.Store(toDelete)
 
 		l.unprocessed.Add(-1)
 	}
